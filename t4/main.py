@@ -25,6 +25,8 @@ respectivamente: topo, esquerda, baixo e direita.'''
     w = img.shape[1]
     label = 1.0
 
+    area_sum = 0
+
     components = []
     for y in range(0, h):
         for x in range(0, w):
@@ -37,17 +39,21 @@ respectivamente: topo, esquerda, baixo e direita.'''
                     'T': h - 1,
                     'L': w - 1,
                     'B': 0,
-                    'R': 0
+                    'R': 0,
+                    'area': 0
                 }
                 flood_fill(img, y, x, comp)
 
                 comp_height = comp['B'] - comp['T'] + 1
                 comp_width = comp['R'] - comp['L'] + 1
 
+                comp['area'] = comp_height * comp_width
+                area_sum += comp['area']
+
                 if comp['n_pixels'] >= n_pixels_min and comp_width >= largura_min and comp_height >= altura_min:
                     components.append(comp)
     
-    return components
+    return components, area_sum/len(components)
 
 def flood_fill(img, y, x, comp):
     img[y][x] = comp['label']
@@ -76,39 +82,52 @@ def flood_fill(img, y, x, comp):
     if x + 1 < w and img[y][x + 1] == 1:
         flood_fill(img, y, x + 1, comp)
 
-img = cv2.imread ('82.bmp', cv2.IMREAD_GRAYSCALE)
+    # Verifica pixel a direita e abaixo
+    if x + 1 < w and y + 1 < h and img[y + 1][x + 1] == 1:
+        flood_fill(img, y, x + 1, comp)
 
-img = cv2.medianBlur(img, 5)
+    # Verifica pixel a direita e acima
+    if x + 1 < w and y - 1 > -1 and img[y - 1][x + 1] == 1:
+        flood_fill(img, y, x + 1, comp)
+
+    # Verifica pixel a esquerda e abaixo
+    if x - 1 > -1 and y + 1 < h and img[y + 1][x - 1] == 1:
+        flood_fill(img, y, x - 1, comp)
+
+    # Verifica pixel a esquerda e acima
+    if x - 1 > -1 and y - 1 > -1 and img[y - 1][x - 1] == 1:
+        flood_fill(img, y, x - 1, comp)
+
+def verify_double_rice(components, avg_area):
+    components_out = components.copy()
+
+    for c in components:
+        if c['area'] > avg_area * 1.5:
+            components_out.append(c)
+
+    return components_out
+
+img = cv2.imread ('114.bmp', cv2.IMREAD_GRAYSCALE)
+
+img_out = cv2.cvtColor (img, cv2.COLOR_GRAY2BGR)
+
+img = cv2.medianBlur(img, 9)
 
 #TODO: Change this parameters
 img = cv2.Canny(img, 40, 140)
 
 img = img.astype (np.float32) / 255
 
-# Mantém uma cópia colorida para desenhar a saída.
-img_out = cv2.cvtColor (img, cv2.COLOR_GRAY2BGR)
+componentes, avg_area = rotula (img, LARGURA_MIN, ALTURA_MIN, N_PIXELS_MIN)
 
-componentes = rotula (img, LARGURA_MIN, ALTURA_MIN, N_PIXELS_MIN)
-n_componentes = len (componentes)
-
-print(n_componentes)
+componentes = verify_double_rice(componentes, avg_area)
 
 for c in componentes:
-        cv2.rectangle (img, (c ['L'], c ['T']), (c ['R'], c ['B']), (0,0,1))
-        
+    cv2.rectangle (img_out, (c ['L'], c ['T']), (c ['R'], c ['B']), (0,0,1))
+
+print(len(componentes))
+
 cv2.imshow('final', img)
-
-""" kernel = np.ones((5,5), np.uint8) 
-  
-img_erosion = cv2.erode(img, kernel, iterations=2)
-img_dilation = cv2.dilate(img_erosion, kernel, iterations=1) 
-
-cv2.imshow('teste', img_dilation)
-  
-gx = cv2.Sobel(img, cv2.CV_32F, 1, 0)
-gy = cv2.Sobel(img, cv2.CV_32F, 0, 1)
-
-cv2.imshow('gy', gy) 
-cv2.imshow('gx', gx) """
-  
-cv2.waitKey(0) 
+cv2.imshow ('final_detec', img_out)
+cv2.waitKey ()
+cv2.destroyAllWindows ()
