@@ -103,12 +103,12 @@ def verify_blobs_rice(components, avg_area):
     num_rices = len(components)
 
     for c in components:
-        if c['n_pixels'] > avg_area * 1.5:
+        if c['n_pixels'] > avg_area:
             num_rices += math.floor(c['n_pixels']/avg_area) - 1
 
     return num_rices
 
-img = cv2.imread ('114.bmp', cv2.IMREAD_GRAYSCALE)
+img = cv2.imread ('82.bmp', cv2.IMREAD_GRAYSCALE)
 
 img_out = cv2.cvtColor (img, cv2.COLOR_GRAY2BGR)
 
@@ -132,6 +132,9 @@ im_out = img | im_floodfill_inv
 img = im_out.astype (np.float32) / 255
 
 componentes, n_pixels_total = rotula (img, LARGURA_MIN, ALTURA_MIN, N_PIXELS_MIN)
+
+print(componentes)
+print(n_pixels_total/len(componentes))
 
 num_rices = verify_blobs_rice(componentes, n_pixels_total/len(componentes))
 
