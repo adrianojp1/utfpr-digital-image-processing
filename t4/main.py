@@ -1,9 +1,14 @@
 import cv2 
 import numpy as np 
+import time
+import math
 
-ALTURA_MIN = 10
-LARGURA_MIN = 10
-N_PIXELS_MIN = 20
+import sys
+sys.setrecursionlimit(1500)
+
+ALTURA_MIN = 1
+LARGURA_MIN = 1
+N_PIXELS_MIN = 2
 
 def rotula (img, largura_min, altura_min, n_pixels_min):
     '''Rotulagem usando flood fill. Marca os objetos da imagem com os valores
@@ -25,12 +30,11 @@ respectivamente: topo, esquerda, baixo e direita.'''
     w = img.shape[1]
     label = 1.0
 
-    area_sum = 0
+    n_pixels_total = 0
 
     components = []
     for y in range(0, h):
         for x in range(0, w):
-            
             if img[y, x] == 1:
                 label += 0.1
                 comp = {
@@ -39,21 +43,18 @@ respectivamente: topo, esquerda, baixo e direita.'''
                     'T': h - 1,
                     'L': w - 1,
                     'B': 0,
-                    'R': 0,
-                    'area': 0
+                    'R': 0
                 }
                 flood_fill(img, y, x, comp)
 
                 comp_height = comp['B'] - comp['T'] + 1
                 comp_width = comp['R'] - comp['L'] + 1
 
-                comp['area'] = comp_height * comp_width
-                area_sum += comp['area']
-
                 if comp['n_pixels'] >= n_pixels_min and comp_width >= largura_min and comp_height >= altura_min:
                     components.append(comp)
+                    n_pixels_total += comp['n_pixels']
     
-    return components, area_sum/len(components)
+    return components, n_pixels_total
 
 def flood_fill(img, y, x, comp):
     img[y][x] = comp['label']
@@ -98,14 +99,14 @@ def flood_fill(img, y, x, comp):
     if x - 1 > -1 and y - 1 > -1 and img[y - 1][x - 1] == 1:
         flood_fill(img, y, x - 1, comp)
 
-def verify_double_rice(components, avg_area):
-    components_out = components.copy()
+def verify_blobs_rice(components, avg_area):
+    num_rices = len(components)
 
     for c in components:
-        if c['area'] > avg_area * 1.5:
-            components_out.append(c)
+        if c['n_pixels'] > avg_area * 1.5:
+            num_rices += math.floor(c['n_pixels']/avg_area) - 1
 
-    return components_out
+    return num_rices
 
 img = cv2.imread ('114.bmp', cv2.IMREAD_GRAYSCALE)
 
@@ -116,16 +117,29 @@ img = cv2.medianBlur(img, 9)
 #TODO: Change this parameters
 img = cv2.Canny(img, 40, 140)
 
-img = img.astype (np.float32) / 255
+im_floodfill = img.copy()
 
-componentes, avg_area = rotula (img, LARGURA_MIN, ALTURA_MIN, N_PIXELS_MIN)
+h, w = img.shape[:2]
 
-componentes = verify_double_rice(componentes, avg_area)
+mask = np.zeros((h + 2, w + 2), np.uint8)
+
+cv2.floodFill(im_floodfill, mask, (0, 0), 255)
+
+im_floodfill_inv = cv2.bitwise_not(im_floodfill)
+
+im_out = img | im_floodfill_inv
+
+img = im_out.astype (np.float32) / 255
+
+componentes, n_pixels_total = rotula (img, LARGURA_MIN, ALTURA_MIN, N_PIXELS_MIN)
+
+num_rices = verify_blobs_rice(componentes, n_pixels_total/len(componentes))
 
 for c in componentes:
     cv2.rectangle (img_out, (c ['L'], c ['T']), (c ['R'], c ['B']), (0,0,1))
 
 print(len(componentes))
+print(num_rices)
 
 cv2.imshow('final', img)
 cv2.imshow ('final_detec', img_out)
