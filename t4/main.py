@@ -1,3 +1,8 @@
+# ===============================================================================
+# Autor: Adriano J. Paulichi, Matheus D. de Freitas
+# Universidade Tecnológica Federal do Paraná
+# ===============================================================================
+
 from statistics import mean, median_low
 import cv2
 import numpy as np
@@ -84,8 +89,8 @@ def fill_borders(img):
 
 def estimate_rice_size(areas):
     median = median_low(areas)
-    upper_limit = median * 1.2
-    lower_limit = median * 0.8
+    upper_limit = median * 1.5
+    lower_limit = median * 0.5
     filtered = [area for area in areas if lower_limit < area < upper_limit]
     avg = mean(filtered)
     return avg
@@ -104,7 +109,7 @@ def count_rices(areas, median_area):
     return count
 
 
-def execute(img_name):
+def execute(img_name, run_fast):
     print('Executing for image: ' + img_name)
     expected_count = int(img_name.split('.')[0])
     img = cv2.imread(img_name, cv2.IMREAD_GRAYSCALE)
@@ -134,14 +139,16 @@ def execute(img_name):
     print('Percentage error: ', error)
     print('=========================================')
 
-    cv2.imshow('original', img_in)
-    cv2.imshow('blur', img_blur)
-    cv2.imshow('borders', img_border)
-    cv2.imshow('filled', img_filled)
-    cv2.waitKey()
-    cv2.destroyAllWindows()
+    if not run_fast:
+        cv2.imshow('original', img_in)
+        cv2.imshow('blur', img_blur)
+        cv2.imshow('borders', img_border)
+        cv2.imshow('filled', img_filled)
+        cv2.waitKey()
+        cv2.destroyAllWindows()
 
 
+run_fast = True
 imgs = ['60', '82', '114', '150', '205']
 for img in imgs:
-    execute(f'{img}.bmp')
+    execute(f'{img}.bmp', run_fast)
