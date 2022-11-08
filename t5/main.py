@@ -16,8 +16,9 @@ OUT_DIR = './resultados/'
 WPP = './wallpapers/Wind Waker GC.bmp'
 SAVE_IMG = True
 SHOW_IMG = False
-# IMGS = os.listdir(IN_DIR).sort()
-IMGS = ['4.bmp']
+IMGS = os.listdir(IN_DIR).sort()
+IMGS = ['0.BMP', '1.bmp', '2.bmp', '3.bmp',
+        '4.bmp', '5.bmp', '6.bmp', '7.bmp', '8.bmp']
 
 
 def get_green_level(bgr):
@@ -34,16 +35,23 @@ def to_green_scale(img):
     for y in range(0, h):
         for x in range(0, w):
             green_scale[y, x] = get_green_level(img[y, x])
+
+    # normalized = cv2.normalize(green_scale, None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
     return green_scale
 
 
 def remove_green(img, green_scale):
-    green_removed = img.copy()
+    green_removed_hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HLS)
     h = img.shape[0]
     w = img.shape[1]
     for y in range(0, h):
         for x in range(0, w):
-            green_removed[y, x][1] = img[y, x][1] * green_scale[y, x][0]
+            # print(green_removed_hsl[y, x][1])
+            # print(green_scale[y, x][1])
+            green_removed_hsv[y, x][1] = max(
+                green_removed_hsv[y, x][1] - (1 - green_scale[y, x][1]), 0)
+            # input()
+    green_removed = cv2.cvtColor(green_removed_hsv, cv2.COLOR_HLS2BGR)
     return green_removed
 
 
