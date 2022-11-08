@@ -4,14 +4,20 @@
 # ===============================================================================
 
 from math import sqrt
+import os
+from pathlib import Path
 import sys
 import numpy as np
 import cv2
-from matplotlib import pyplot as plt
 
 
 IN_DIR = './img/'
+OUT_DIR = './resultados/'
 WPP = './wallpapers/Wind Waker GC.bmp'
+SAVE_IMG = True
+SHOW_IMG = False
+# IMGS = os.listdir(IN_DIR).sort()
+IMGS = ['4.bmp']
 
 
 def get_green_level(bgr):
@@ -28,47 +34,38 @@ def to_green_scale(img):
     for y in range(0, h):
         for x in range(0, w):
             green_scale[y, x] = get_green_level(img[y, x])
-            
-    normalized = cv2.normalize(green_scale, None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
-    return normalized
+    return green_scale
 
 
-def merge(img, green_scale, binary_green, wpp):
-    merged = img.copy()
+def remove_green(img, green_scale):
+    green_removed = img.copy()
     h = img.shape[0]
     w = img.shape[1]
     for y in range(0, h):
         for x in range(0, w):
-            # Check if it is close to green
-            if binary_green[y, x] == 0:
-                # Remove green
-                merged[y, x][1] = 0
-                wpp_factor = (1 - green_scale[y, x]) * wpp[y, x]
-                src_factor = green_scale[y, x] * merged[y, x]
-                merged[y, x] = wpp_factor + src_factor
+            green_removed[y, x][1] = img[y, x][1] * green_scale[y, x][0]
+    return green_removed
+
+
+def merge(green_scale, green_removed, wpp):
+    merged = green_removed.copy()
+    h = green_removed.shape[0]
+    w = green_removed.shape[1]
+    for y in range(0, h):
+        for x in range(0, w):
+            wpp_factor = (1 - green_scale[y, x]) * wpp[y, x]
+            src_factor = green_scale[y, x] * merged[y, x]
+            merged[y, x] = wpp_factor + src_factor
     return merged
 
 
-def binarize(img):
-    img = (img * 255).astype(np.uint8)[:, :, 0]
-
-    # histr = cv2.calcHist([img], [0], None, [256], [0, 256])
-    # plt.plot(histr)
-
-    (T, thresh_img) = cv2.threshold(
-        img, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
-    print('Threshhold: ', T)
-
-    # plt.show()
-    return thresh_img
-
-
-def save_img(src_name, img, img_name):
+def save_img(path, img, img_name):
     write = (img * 255).astype(np.uint8)
-    cv2.imwrite(f'{src_name}/{img_name}.bmp', write)
+    cv2.imwrite(f'{path}/{img_name}.bmp', write)
 
 
 def execute(wpp, img_name, save, show):
+    print('=======================================================')
     img_path = IN_DIR + img_name
     print('Executing for image: ' + img_path)
     src = cv2.imread(img_path, cv2.IMREAD_COLOR)
@@ -82,25 +79,25 @@ def execute(wpp, img_name, save, show):
     print('Calculating green scale')
     green_scale = to_green_scale(src)
 
-    
-    binary_green = binarize(green_scale)
+    print('Removing green')
+    green_removed = remove_green(src, green_scale)
 
     print('Merging')
-    result = merge(src, green_scale, binary_green, wpp)
+    result = merge(green_scale, green_removed, wpp)
 
     if save:
         print('Saving images')
-        save_img(img_name, green_scale, 'green_scale')
-        
-        binary_green = src.astype(np.float32) / 255
-        save_img(img_name, binary_green, 'binary_green')
-        save_img(img_name, wpp, 'wpp')
-        save_img(img_name, result, 'result')
+        path = OUT_DIR + img_name
+        Path(path).mkdir(parents=True, exist_ok=True)
+
+        save_img(path, green_scale, 'green_scale')
+        save_img(path, green_removed, 'green_removed')
+        save_img(path, wpp, 'wpp')
+        save_img(path, result, 'result')
 
     if show:
         cv2.imshow('src', src)
         cv2.imshow('green_scale', green_scale)
-        cv2.imshow('binary_green', binary_green)
         cv2.imshow('wpp', wpp)
         cv2.imshow('result', result)
 
@@ -116,7 +113,9 @@ def main():
         sys.exit()
     wpp = wpp.astype(np.float32) / 255
 
-    execute(wpp, '1.bmp', True, False)
+    print('Images:', IMGS)
+    for img_name in IMGS:
+        execute(wpp, img_name, SAVE_IMG, SHOW_IMG)
 
 
 if __name__ == '__main__':
