@@ -16,42 +16,54 @@ OUT_DIR = './resultados/'
 WPP = './wallpapers/Wind Waker GC.bmp'
 SAVE_IMG = True
 SHOW_IMG = False
-IMGS = os.listdir(IN_DIR).sort()
 IMGS = ['0.BMP', '1.bmp', '2.bmp', '3.bmp',
         '4.bmp', '5.bmp', '6.bmp', '7.bmp', '8.bmp']
 
 
-def get_green_level(bgr):
-    b, g, r = bgr
-    green_distance = sqrt(r*r + (g - 1)*(g - 1) + b*b)
-    capped = min(1, green_distance)
-    return capped
+def get_green_level(hue):
+    if hue >= 90 and hue < 120:
+        return hue/120
+    elif hue >= 120 and hue <= 150:
+        return 1 - (hue - 120)/30
+    else:
+        return 0
+
+
+def get_lightness_level(lightness):
+    if lightness < 0.5:
+        return lightness/0.5
+    else:
+        return (1 - lightness)/0.5
 
 
 def to_green_scale(img):
     green_scale = img.copy()
     h = img.shape[0]
     w = img.shape[1]
+
+    hls = cv2.cvtColor(img, cv2.COLOR_BGR2HLS)
+
     for y in range(0, h):
         for x in range(0, w):
-            green_scale[y, x] = get_green_level(img[y, x])
+            green_scale[y, x] = get_green_level(hls[y, x][0]) \
+                * get_lightness_level(hls[y, x][1]) * hls[y, x][2]
 
-    # normalized = cv2.normalize(green_scale, None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
-    return green_scale
+    normalized = cv2.normalize(
+        green_scale, None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
+    return 1 - normalized
 
 
 def remove_green(img, green_scale):
-    green_removed_hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HLS)
+    green_removed_hls = cv2.cvtColor(img, cv2.COLOR_BGR2HLS)
     h = img.shape[0]
     w = img.shape[1]
+
     for y in range(0, h):
         for x in range(0, w):
-            # print(green_removed_hsl[y, x][1])
-            # print(green_scale[y, x][1])
-            green_removed_hsv[y, x][1] = max(
-                green_removed_hsv[y, x][1] - (1 - green_scale[y, x][1]), 0)
-            # input()
-    green_removed = cv2.cvtColor(green_removed_hsv, cv2.COLOR_HLS2BGR)
+            green_removed_hls[y, x][1] = max(
+                green_removed_hls[y, x][1] - (1 - green_scale[y, x][1]), 0)
+
+    green_removed = cv2.cvtColor(green_removed_hls, cv2.COLOR_HLS2BGR)
     return green_removed
 
 
@@ -59,6 +71,7 @@ def merge(green_scale, green_removed, wpp):
     merged = green_removed.copy()
     h = green_removed.shape[0]
     w = green_removed.shape[1]
+    
     for y in range(0, h):
         for x in range(0, w):
             wpp_factor = (1 - green_scale[y, x]) * wpp[y, x]
